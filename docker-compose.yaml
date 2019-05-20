@@ -1,0 +1,36 @@
+version: "3"
+
+services:
+
+  # MySQL Database
+  db:
+    image: mysql:5.7
+    container_name: "cb_database"
+    environment:
+       MYSQL_ROOT_PASSWORD: coldbox
+       MYSQL_DATABASE: cms
+       MYSQL_USER: cms
+       MYSQL_PASSWORD: coldbox
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./build/db:/var/lib/mysql
+      - ./workbench/db/cms.sql:/docker-entrypoint-initdb.d/cms.sql
+  
+  # API
+  #api:
+  #  depends_on:
+  #    - db
+  #  image: ortussolutions/commandbox
+  #  container_name: "api"
+  #  # Environment Variables
+  #  environment:
+  #    cfconfig_adminPassword: coldbox
+  #  # Ports
+  #  ports:
+  #    - "8080:8080"
+  #  # Data & Overrides
+  #  volumes:
+  #    - ./:/app
+  #  links:
+  #    - db:database
