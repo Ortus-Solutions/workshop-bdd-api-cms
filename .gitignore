@@ -1,4 +1,4 @@
 # Docker DB
 build/**
 # Workbench Seeder
-#workbench/resources/seeder/mockdatacfc/**
+workbench/resources/seeder/mockdatacfc/**
