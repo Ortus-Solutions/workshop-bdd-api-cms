@@ -17,7 +17,11 @@ component singleton accessors="true"{
 
 	boolean function authenticate( required username, required password ){
 		var qUser = findByUsername( arguments.username );
-		return bcrypt.checkPassword( arguments.password, qUser.password );
+		try{ 
+			return bcrypt.checkPassword( arguments.password, qUser.password );
+		} catch( any e ){
+			return false;
+		}
 	}
 
 	query function findByUsername( required username ){
@@ -30,7 +34,7 @@ component singleton accessors="true"{
 	string function generateAuth( required username ){
 		return jwt.encode(
 			{
-				id 		: findIdByUsername( arguments.username ),
+				id 		: findByUsername( arguments.username ).id,
 				created : now(),
 				expires : dateAdd( "h", 1, now() )
 			},

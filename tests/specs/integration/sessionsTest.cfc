@@ -52,7 +52,7 @@ component extends="tests.resources.BaseIntegrationSpec" {
 					);
 					var response = event.getPrivateValue( "Response" );
 					expect( response.getError() ).toBeFalse( response.getMessages().toString() );
-					debug( response.getData() );
+					expect( response.getData() ).toBeString();
 				});
 			});
 
