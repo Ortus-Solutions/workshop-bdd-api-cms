@@ -1,0 +1,19 @@
+{
+    "whitespaceManagement":"white-space-pref",
+	"requestTimeout":"0,0,5,0",
+	"datasources" : {
+		 "cms":{
+			 "host":"${DB_HOST}",
+			 "dbdriver":"MySQL",
+			 "database":"${DB_DATABASE}",
+			 "dsn":"jdbc:mysql://{host}:{port}/{database}",
+			 "custom":"useUnicode=true&characterEncoding=UTF-8&useLegacyDatetimeCode=true&autoReconnect=true&useSSL=false",
+			 "port":"${DB_PORT}",
+			 "class":"com.mysql.jdbc.Driver",
+			 "username":"${DB_USER}",
+			 "password":"${DB_PASSWORD}",
+			 "connectionLimit":"100",
+			 "connectionTimeout":"1"
+		 }
+	}
+}
