@@ -42,7 +42,7 @@ component extends="tests.resources.BaseIntegrationSpec" {
 
 			
 			given( "usuario y password validos", function(){
-				then( "me autenticare y recibire mi token JWT", function(){
+				then( "me autenticare y recibire mi token JWT que expira en 1 hora", function(){
 					var event = post(
 						route = "/sessions",
 						params = {
@@ -53,6 +53,10 @@ component extends="tests.resources.BaseIntegrationSpec" {
 					var response = event.getPrivateValue( "Response" );
 					expect( response.getError() ).toBeFalse( response.getMessages().toString() );
 					expect( response.getData() ).toBeString();
+					
+					var decoded = getInstance( "UserService" ).decodeAuth( response.getData() );
+					expect( decoded.id ).toBe( 10 );
+					expect( decoded.expires ).toBe( dateAdd( "h", 1, decoded.created ) );
 				});
 			});
 

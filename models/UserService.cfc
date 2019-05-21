@@ -32,14 +32,34 @@ component singleton accessors="true"{
 	}
 
 	string function generateAuth( required username ){
+		var rightNow = now();
 		return jwt.encode(
 			{
-				id 		: findByUsername( arguments.username ).id,
-				created : now(),
-				expires : dateAdd( "h", 1, now() )
+				"id" 		: findByUsername( arguments.username ).id,
+				"created" : rightNow,
+				"expires" : dateAdd( "h", 1, rightNow )
 			},
 			variables.encodingKey
 		);
+	}
+
+	/**
+	 * Decode the jwt auth token and retrieve a representation of in in struct format.
+	 * If the token cannot be decoded or it is invalid, it will return a new return struct with an empty id.
+	 *
+	 * @token The jwt token to decode
+	 * 
+	 * @return { id:numeric, created:datetime, expires:datetime }
+	 */
+	struct function decodeAuth( required token ){
+		if( jwt.verify( arguments.token, variables.encodingKey ) ){
+			return jwt.decode( arguments.token, variables.encodingKey );
+		} 
+		return {
+			"id" : "",
+			"created" : now(),
+			"expires" : now()
+		};
 	}
 
 	/**

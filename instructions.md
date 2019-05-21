@@ -297,6 +297,8 @@ story( "Quiero registrar usuarios en mi sistema de cms", function(){
 });
 ```
 
+### Controlador
+
 Ahora terminemos el controlador con esta funcionalidad:
 
 ```java
@@ -405,7 +407,6 @@ component singleton accessors="true"{
 
 Ahora vamonos a nuestro console `testbox run` o runner de pruebas: http://127.0.0.1:42518/tests/runner.cfm. Y comprobemos que nuestro requisito esta completo.  Si esta completo y tenemos luz verde, pasemos al siguiente paso.
 
-
 ## Autenticacion
 
 Ahora nos enfocaremos en creaer la autenticacion de nuestro servicio.  Crearemos esto basada en la siguiente historia de requisito:
@@ -414,7 +415,7 @@ Ahora nos enfocaremos en creaer la autenticacion de nuestro servicio.  Crearemos
 story( "Quiero poder autenticar un usuario ocupando username/password y recibir un token JWT que expiren cada hora" )
 ```
 
-### Controladores y BDD
+### BDD e Integracion
 
 Para esto ocuparemos el module `jwt` el cual pueden encontrar la informacion aca: https://www.forgebox.io/view/jwt
 
@@ -422,11 +423,214 @@ Para esto ocuparemos el module `jwt` el cual pueden encontrar la informacion aca
 coldbox create handler name="sessions" actions="create"
 ```
 
+Ahora abramos la prueba BDD: `/tests/specs/integration/sessionsTest.cfc` y modifiquemsla para que tenga dos escenarios:
+
+```java
+/*******************************************************************************
+*	Integration Test as BDD (CF10+ or Railo 4.1 Plus)
+*
+*	Extends the integration class: coldbox.system.testing.BaseTestCase
+*
+*	so you can test your ColdBox application headlessly. The 'appMapping' points by default to 
+*	the '/root' mapping created in the test folder Application.cfc.  Please note that this 
+*	Application.cfc must mimic the real one in your root, including ORM settings if needed.
+*
+*	The 'execute()' method is used to execute a ColdBox event, with the following arguments
+*	* event : the name of the event
+*	* private : if the event is private or not
+*	* prePostExempt : if the event needs to be exempt of pre post interceptors
+*	* eventArguments : The struct of args to pass to the event
+*	* renderResults : Render back the results of the event
+*******************************************************************************/
+component extends="tests.resources.BaseIntegrationSpec" {
+	
+	/*********************************** LIFE CYCLE Methods ***********************************/
+
+	function beforeAll(){
+		super.beforeAll();
+		// do your own stuff here
+	}
+
+	function afterAll(){
+		// do your own stuff here
+		super.afterAll();
+	}
+
+	/*********************************** BDD SUITES ***********************************/
+	
+	function run(){
+
+		story( "Quiero poder autenticar un usuario ocupando username/password y recibir un token JWT que expiren cada hora", function(){
+
+			beforeEach(function( currentSpec ){
+				// Setup as a new ColdBox request for this suite, VERY IMPORTANT. ELSE EVERYTHING LOOKS LIKE THE SAME REQUEST.
+				setup();
+			});
+
+			
+			given( "usuario y password validos", function(){
+				then( "me autenticare y recibire mi token JWT que expira en 1 hora", function(){
+					var event = post(
+						route = "/sessions",
+						params = {
+							username = "Milkshake10",
+							password = "test"
+						}
+					);
+					var response = event.getPrivateValue( "Response" );
+					expect( response.getError() ).toBeFalse( response.getMessages().toString() );
+					expect( response.getData() ).toBeString();
+					
+					var decoded = getInstance( "UserService" ).decodeAuth( response.getData() );
+					expect( decoded.id ).toBe( 10 );
+					expect( decoded.expires ).toBe( dateAdd( "h", 1, decoded.created ) );
+				});
+			});
+
+			given( "usuario o password invalidos", function(){
+				then( "recibire un error y mensaje", function(){
+					var event = post(
+						route = "/sessions",
+						params = {
+							username = "invalido",
+							password = "invalido"
+						}
+					);
+					var response = event.getPrivateValue( "Response" );
+					expect( response.getError() ).toBeTrue();
+				});
+			});
+		
+		});
+
+	}
+
+}
+```
+
+Corre tus pruebas y empezemos la implementacion.
+
+### Rutas
+
+Agreguemos la ruta para la registracion como un ColdBox URL resource: `config/Router.cfc`. Aca puedes ver toda la informacion sobre rutas resourceful: https://coldbox.ortusbooks.com/the-basics/routing/routing-dsl/resourceful-routes
+
+```bash
+resources( "sessions" );
+```
+
+Visualizala en el route visualizer.
+
+### Controlador
+
+Ahora terminemos el controlador con esta funcionalidad:
+
+```java
+/**
+* I am a new handler
+*/
+component extends="BaseHandler"{
+
+	property name="userService"	inject="UserService";
+	 
+	/**
+	 * authenticate in the system
+	 */
+	function create( event, rc, prc ){
+		event
+			.paramValue( "username", "" )
+			.paramValue( "password", "" );
+		
+		if( userService.authenticate( rc.username, rc.password ) ){
+			prc.response
+				.setData( 
+					userService.generateAuth( rc.username )
+				);
+		} else {
+			prc.response
+				.setError( true )
+				.addMessage( "Usuario o contraseña invalida! Intenta de nuevo!" );
+		}
+	}
+	
+}
+```
+
+## Modelos
+
+Ahora tendremos que actualizar el modelo de `UserService` para poder soportar la funcionalidad de JWT tokens. Primero injectaremos el servicio de JWT del module `jwt` que instalamos y las siguientes funciones:
+
+* `authenticate( username, password )` - Con la cual verificaremos que el usuario pueda log in
+* `findByUsername( username )` - Con la cual devolveremos un record de usuario por username
+* `generateAuth( username )` - Con la cual crearemos un JTW token packet con la informacion de usuario y expiracion.
+* `decodeAuth( token )` - Con la cual obtendremos un packete de login nativo (struct) de acuerdo al token pasado.
+
+Tambien haremos un `encodingKey` que sera nuestro key secreto de encripcion para nuestros tokens.  Este key fue creado en CommandBox CLI ocupando en el siguiente comando: `#createUUID`.
+
+```java
+    // JWT Service
+    property name="jwt"		 	inject="JWTService@jwt";
+    
+    /**
+	 * Constructor
+	 */
+	UserService function init(){
+		variables.encodingKey = "03CB417D-5CA6-4F67-808654E354FE2322";
+		return this;
+	}
+
+	boolean function authenticate( required username, required password ){
+		var qUser = findByUsername( arguments.username );
+		try{ 
+			return bcrypt.checkPassword( arguments.password, qUser.password );
+		} catch( any e ){
+			return false;
+		}
+	}
+
+	query function findByUsername( required username ){
+		return queryExecute(
+			"SELECT * FROM users WHERE `username` = ?",
+			[ arguments.username ]
+		);
+	}
+
+	string function generateAuth( required username ){
+		var rightNow = now();
+		return jwt.encode(
+			{
+				"id" 		: findByUsername( arguments.username ).id,
+				"created" : rightNow,
+				"expires" : dateAdd( "h", 1, rightNow )
+			},
+			variables.encodingKey
+		);
+	}
+
+	/**
+	 * Decode the jwt auth token and retrieve a representation of in in struct format.
+	 * If the token cannot be decoded or it is invalid, it will return a new return struct with an empty id.
+	 *
+	 * @token The jwt token to decode
+	 * 
+	 * @return { id:numeric, created:datetime, expires:datetime }
+	 */
+	struct function decodeAuth( required token ){
+		if( jwt.verify( arguments.token, variables.encodingKey ) ){
+			return jwt.decode( arguments.token, variables.encodingKey );
+		} 
+		return {
+			"id" : "",
+			"created" : now(),
+			"expires" : now()
+		};
+	}
+```
+
+Hemos terminado toda la funcionalidad, corre las pruebas y verifica que todo este en orden!  Ahora podemos registrar usuarios y podemos autenticarlos.  El siguiente paso sera create contenido y por ultimo protegeremos las rutas de contenido para solo usuarios con este token JWT.
 
 
 
 
-* Build out auth feature with tokens. Secure will be later. 
 * List published items order by date
     * /content?orderBy=publishedDate&isPublished=Boolean&userid=x - get
 * List a content item by slug
