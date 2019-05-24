@@ -9,6 +9,7 @@ component extends="BaseHandler"{
 	* index
 	*/
 	function index( event, rc, prc ){
+		event.paramValue( "orderBy", "" );
 		prc.response.setData(
 			contentService.list()
 				.map( ( item ) => { return item.getMemento(); } )

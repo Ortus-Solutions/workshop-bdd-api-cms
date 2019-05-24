@@ -22,9 +22,13 @@ component singleton accessors="true"{
 	/**
 	* list
 	*/
-	array function list( orderBy="publishedDate" ){
+	array function list( orderBy="" ){
+		if( !arguments.orderBy.len() ){
+			arguments.orderBy = "publishedDate desc";
+		}
 		return queryExecute(
-			"SELECT * FROM content ORDER BY ?",
+			"SELECT * FROM content
+				  ORDER BY ?",
 			[ arguments.orderBy ],
 			{
 				returnType : "array"
