@@ -19,7 +19,6 @@ component extends="tests.resources.BaseIntegrationSpec" {
 	/*********************************** LIFE CYCLE Methods ***********************************/
 
 	function beforeAll(){
-		reset();
 		super.beforeAll();
 		// do your own stuff here
 	}

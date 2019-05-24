@@ -6,6 +6,10 @@ component singleton accessors="true"{
 	// Properties
 	property name="bcrypt" 		inject="@BCrypt";
 	property name="jwt"		 	inject="JWTService@jwt";
+	// To populate objects from data
+    property name="populator" inject="wirebox:populator";
+    // To create new User instances
+    property name="wirebox" inject="wirebox";
 
 	/**
 	 * Constructor
@@ -13,6 +17,15 @@ component singleton accessors="true"{
 	UserService function init(){
 		variables.encodingKey = "03CB417D-5CA6-4F67-808654E354FE2322";
 		return this;
+	}
+
+	User function new() provider="User";
+
+	User function findById( required id ){
+		return populator.populateFromQuery(
+            new(),
+            queryExecute( "SELECT * FROM `users` WHERE `id` = ?", [ id ] )
+        );
 	}
 
 	boolean function authenticate( required username, required password ){
@@ -30,7 +43,7 @@ component singleton accessors="true"{
 			[ arguments.username ]
 		);
 	}
-
+	
 	string function generateAuth( required username ){
 		var rightNow = now();
 		return jwt.encode(

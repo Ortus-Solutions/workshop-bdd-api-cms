@@ -13,7 +13,8 @@ component accessors="true"{
 	property name="modifiedDate" type="date";
 
 	this.memento = {
-		defaultIncludes = [ "id", "name", "email", "username", "createdDate", "modifiedDate" ],
+		defaultIncludes = [ "*" ],
+		//defaultIncludes = [ "id", "name", "email", "username", "createdDate", "modifiedDate" ],
 		neverInclude = [ "password" ]
 	};
 

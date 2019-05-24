@@ -14,11 +14,12 @@
 *	* eventArguments : The struct of args to pass to the event
 *	* renderResults : Render back the results of the event
 *******************************************************************************/
-component extends="tests.resources.BaseIntegrationSpec"{
+component extends="tests.resources.BaseIntegrationSpec" {
 	
 	/*********************************** LIFE CYCLE Methods ***********************************/
 
 	function beforeAll(){
+		reset();
 		super.beforeAll();
 		// do your own stuff here
 	}
@@ -32,38 +33,49 @@ component extends="tests.resources.BaseIntegrationSpec"{
 	
 	function run(){
 
-		story( "Quiero registrar usuarios en mi sistema de cms", function(){
+		story( "Quiero poder ver contenido con diferentes tipos de opciones", function(){
 
 			beforeEach(function( currentSpec ){
 				// Setup as a new ColdBox request for this suite, VERY IMPORTANT. ELSE EVERYTHING LOOKS LIKE THE SAME REQUEST.
 				setup();
 			});
 
-			given( "datos validos y mi usuario esta valido", function(){
-				then( "puedo registrar un usuario", function(){
-					// Pruebo que mi usuario no exista
-					expect( 
-						queryExecute( 
-							"select * from users where username = :username", 
-							{ username : "testadmin" }, 
-							{ returntype = "array" } 
-						) 
-					).toBeEmpty();
-
-					var event = post( "/registration", {
-						"name"					= "Mi Nombre",
-						"email"                	= "testadmin@ortussolutions.com",
-						"username"             	= "testadmin",
-						"password"             	= "testadmin"
-					} );
-					var response = event.getPrivateValue( "Response" );
-					
-					expect( response.getError() ).toBeFalse();
-					writeDump( var=response.getData() );
-					expect( response.getData().id ).toBeNumeric();
-					expect( response.getData().name ).toBe( "Mi Nombre" );
-				});
+			it( "pude mostrar todas los contenidos en el sistema", function(){
+				var event = get( route = "/content" );
+				var response = event.getPrivateValue( "Response" );
+				expect( response.getError() ).toBeFalse();
+				expect( response.getData() ).toBeArray();
 			});
+
+			it( "mostrar un contenido por slug", function(){
+				var testSlug = "Spoon-School-Staircase";
+				var event = get( route = "/content/#testSlug#" );
+				var response = event.getPrivateValue( "Response" );
+				debug( response.getMessages() );
+				expect( response.getError() ).toBeFalse();
+				expect( response.getData() ).toBeStruct();
+				expect( response.getData().slug ).toBe( testSlug );
+			});
+
+			xit( "crear un nuevo contenido", function(){
+				var event = execute( event="content.create", renderResults=true );
+				// expectations go here.
+				expect( false ).toBeTrue();
+			});
+
+			xit( "editar un contenido", function(){
+				var event = execute( event="content.update", renderResults=true );
+				// expectations go here.
+				expect( false ).toBeTrue();
+			});
+
+			xit( "puedo borrar un contenido", function(){
+				var event = execute( event="content.delete", renderResults=true );
+				// expectations go here.
+				expect( false ).toBeTrue();
+			});
+
+		
 		});
 
 	}

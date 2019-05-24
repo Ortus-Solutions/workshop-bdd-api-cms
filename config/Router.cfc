@@ -5,6 +5,7 @@ component{
 
 		resources( "registration" );
 		resources( "sessions" );
+		resources( "content" );
 
 		route( ":handler/:action?" ).end();
 	}

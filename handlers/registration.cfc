@@ -8,7 +8,7 @@ component extends="BaseHandler"{
 	/**
 	 * create
 	 */
-	function create( event, rc, prc ){
+	function create( event, rc, prc ) {
 		prc.oUser = populateModel( "User" );
 		userService.create( prc.oUser );
 		

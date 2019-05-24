@@ -555,7 +555,7 @@ component extends="BaseHandler"{
 }
 ```
 
-## Modelos
+### Modelos
 
 Ahora tendremos que actualizar el modelo de `UserService` para poder soportar la funcionalidad de JWT tokens. Primero injectaremos el servicio de JWT del module `jwt` que instalamos y las siguientes funciones:
 
@@ -626,20 +626,361 @@ Tambien haremos un `encodingKey` que sera nuestro key secreto de encripcion para
 	}
 ```
 
-Hemos terminado toda la funcionalidad, corre las pruebas y verifica que todo este en orden!  Ahora podemos registrar usuarios y podemos autenticarlos.  El siguiente paso sera create contenido y por ultimo protegeremos las rutas de contenido para solo usuarios con este token JWT.
+Hemos terminado toda la funcionalidad, corre las pruebas y verifica que todo este en orden!  Ahora podemos registrar usuarios y podemos autenticarlos.  El siguiente paso sera crear el contenido y por ultimo protegeremos las rutas de contenido para solo usuarios con este token JWT.
+
+## Ver Contenido
+
+Empezaremos con historias para consumir el contenido que esta ya en la base de datos.
+
+```java
+story( "Quiero poder ver contenido con diferentes tipos de opciones" )
+story( "Quiero poder ver un solo contenido por medio de su slug" )
+```
+
+Empezaremos modelando el contenido
+
+### Content.cfc
+
+* id
+* slug
+* title
+* body
+* isPublished:boolean
+* publishedDate:date
+* createdDate:date
+* modifiedDate:date
+* userId
+
+Crearemos el modelo, un test basico y luego nos vamos a los requisitos:
+
+```bash
+coldbox create model name="Content" properties="id,slug,title,body,isPublished:boolean,publishedDate:date,createdDate:date,modifiedDate:date,FK_userID,user"
+```
+
+Ahora hagamos las siguientes modificaciones para soportar los siguientes requisitos:
+
+* Fechas inicializadas en init
+* Agregar un `isLoaded()` para verificar si el contenido es nuevo o viene de la base de datos
+* Agregar un `getUser()` para poder devolver un objeto de usuario al cual este contenido pertenece
+
+```java
+/**
+* I am a new Model Object
+*/
+component accessors="true"{
+
+	// inject the user service
+	property name="userService" inject="UserService";
+	
+	// Properties
+	property name="id"            type="string";
+	property name="slug"          type="string";
+	property name="title"         type="string";
+	property name="body"          type="string";
+	property name="isPublished"   type="boolean";
+	property name="publishedDate" type="date";
+	property name="createdDate"   type="date";
+	property name="modifiedDate"  type="date";
+	property name="FK_userId" 		default="";
+	property name="user";
+
+	this.memento = {
+		defaultIncludes = [ "*" ],
+		defaultExcludes = [ "fk_UserID" ]
+	};
+	
+
+	/**
+	 * Constructor
+	 */
+	Content function init(){
+		variables.createdDate 	= now();
+		variables.modifiedDate 	= now();
+		variables.FK_userID 	= "";
+		return this;
+	}
+
+	boolean function isLoaded(){
+		return ( !isNull( variables.id ) && len( variables.id ) );
+	}
+
+	User function getUser(){
+		return userService.findById( variables.FK_userId );
+	}
+	
+
+}
+```
+
+Ahora abre la prueba: `/tests/specs/unit/UserTest.cfc`:
+
+```java
+describe( "Usuario", function(){
+			
+    it( "puede ser creado", function(){
+        expect( model ).toBeComponent();
+    });
+
+});
+```
+
+Corre tus tests!  
+
+### BDD e Integración
+
+Ahora que tenemos el modelo empezaremos por la integracion y requisitos.  Ademas de ver contenido agregaremos todas las funciones que necesitaremos:
+
+* `index` : Ver todos los contenidos
+* `create` : Crear un contenido
+* `show` : Ver un solo contenido
+* `update` : Editar un contenido
+* `delete` : Borrar un contenido
+
+```bash
+coldbox create handler name="content" actions="index,create,show,update,delete"
+```
+
+Este comando creara la prueba BDD tambien bajo: `/tests/specs/integration/contentTest.cfc` el cual lo rellenaremos:
+
+```java
+/*******************************************************************************
+*	Integration Test as BDD (CF10+ or Railo 4.1 Plus)
+*
+*	Extends the integration class: coldbox.system.testing.BaseTestCase
+*
+*	so you can test your ColdBox application headlessly. The 'appMapping' points by default to 
+*	the '/root' mapping created in the test folder Application.cfc.  Please note that this 
+*	Application.cfc must mimic the real one in your root, including ORM settings if needed.
+*
+*	The 'execute()' method is used to execute a ColdBox event, with the following arguments
+*	* event : the name of the event
+*	* private : if the event is private or not
+*	* prePostExempt : if the event needs to be exempt of pre post interceptors
+*	* eventArguments : The struct of args to pass to the event
+*	* renderResults : Render back the results of the event
+*******************************************************************************/
+component extends="tests.resources.BaseIntegrationSpec" {
+	
+	/*********************************** LIFE CYCLE Methods ***********************************/
+
+	function beforeAll(){
+		reset();
+		super.beforeAll();
+		// do your own stuff here
+	}
+
+	function afterAll(){
+		// do your own stuff here
+		super.afterAll();
+	}
+
+	/*********************************** BDD SUITES ***********************************/
+	
+	function run(){
+
+		story( "Quiero poder ver contenido con diferentes tipos de opciones", function(){
+
+			beforeEach(function( currentSpec ){
+				// Setup as a new ColdBox request for this suite, VERY IMPORTANT. ELSE EVERYTHING LOOKS LIKE THE SAME REQUEST.
+				setup();
+			});
+
+			it( "pude mostrar todas los contenidos en el sistema", function(){
+				var event = get( route = "/content" );
+				var response = event.getPrivateValue( "Response" );
+				expect( response.getError() ).toBeFalse();
+				expect( response.getData() ).toBeArray();
+			});
+
+			it( "mostrar un contenido por slug", function(){
+				var testSlug = "Spoon-School-Staircase";
+				var event = get( route = "/content/#testSlug#" );
+				var response = event.getPrivateValue( "Response" );
+				debug( response.getMessages() );
+				expect( response.getError() ).toBeFalse();
+				expect( response.getData() ).toBeStruct();
+				expect( response.getData().slug ).toBe( testSlug );
+			});
+
+			xit( "crear un nuevo contenido", function(){
+				var event = execute( event="content.create", renderResults=true );
+				// expectations go here.
+				expect( false ).toBeTrue();
+			});
+
+			xit( "editar un contenido", function(){
+				var event = execute( event="content.update", renderResults=true );
+				// expectations go here.
+				expect( false ).toBeTrue();
+			});
+
+			xit( "puedo borrar un contenido", function(){
+				var event = execute( event="content.delete", renderResults=true );
+				// expectations go here.
+				expect( false ).toBeTrue();
+			});
+
+		
+		});
+
+	}
+
+}
+
+```
+
+### Rutas
+
+Agreguemos la ruta para la registracion como un ColdBox URL resource: `config/Router.cfc`. Aca puedes ver toda la informacion sobre rutas resourceful: https://coldbox.ortusbooks.com/the-basics/routing/routing-dsl/resourceful-routes
+
+```bash
+resources( "content" );
+```
+
+Visualizala en el route visualizer.
+
+### Controlador
+
+Ahora terminemos el controlador con esta funcionalidad:
+
+```java
+/**
+* I am a new handler
+*/
+component extends="BaseHandler"{
+	
+	property name="contentService" inject="contentService";
+		
+	/**
+	* index
+	*/
+	function index( event, rc, prc ){
+		prc.response.setData(
+			contentService.list()
+				.map( ( item ) => { return item.getMemento(); } )
+		);
+	}
+
+	/**
+	* create
+	*/
+	function create( event, rc, prc ){
+		event.setView( "content/create" );
+	}
+
+	/**
+	* show
+	*/
+	function show( event, rc, prc ){
+		event.paramValue( "id", "" );
+		prc.response.setData(
+			contentService.findBySlug( rc.id ).getMemento()
+		);
+	}
+
+	/**
+	* update
+	*/
+	function update( event, rc, prc ){
+		event.setView( "content/update" );
+	}
+
+	/**
+	* delete
+	*/
+	function delete( event, rc, prc ){
+		event.setView( "content/delete" );
+	}
 
 
+	
+}
+```
+
+### Modelos
+
+Ahora crearemos el servicio que nos ayudara a soportar los requisitos de contenido:
+
+```bash
+coldbox create model name="ContentService" persistence="singleton" methods="list,get"
+```
+
+Abre la prueba y chequemos que podamos crear el servicio:
+
+```java
+describe( "ContentService", function(){
+    it( "puede ser creado", function(){
+        expect( model ).toBeComponent();
+    });
+});
+```
+
+Recuerda que ocuparemos BDD y pruebas de integracion.  Todos los metodos que agregaremos aca seran probados por medio de integracion y no por medio de "unit testing".
+
+```java
+/**
+* I am a new Model Object
+*/
+component singleton accessors="true"{
+	
+	// Properties
+	// To populate objects from data
+    property name="populator" inject="wirebox:populator";
+    // To create new User instances
+    property name="wirebox" inject="wirebox";
+
+	/**
+	 * Constructor
+	 */
+	ContentService function init(){
+		
+		return this;
+	}
+
+	Content function new() provider="Content";
+	
+	/**
+	* list
+	*/
+	array function list( orderBy="publishedDate" ){
+		return queryExecute(
+			"SELECT * FROM content ORDER BY ?",
+			[ arguments.orderBy ],
+			{
+				returnType : "array"
+			}
+		).map( ( content ) => {
+			return populator.populateFromStruct(
+                new(),
+                content
+            );
+		} )
+	}
+
+	/**
+	* findBySlug
+	*/
+	Content function findBySlug( required slug ){
+		return populator.populateFromQuery(
+            new(),
+            queryExecute( "SELECT * FROM `content` WHERE `slug` = ?", [ arguments.slug ] )
+        );
+	}
 
 
-* List published items order by date
-    * /content?orderBy=publishedDate&isPublished=Boolean&userid=x - get
-* List a content item by slug
-    * /content/:slug - get
-* Create a new item
-    * /content/:slug - post
-* Edit an item by slug
-    * /content/:slug - put
-* Publish an item by slug
-    * /content/:slug/publish - post
-* Unpublish an item by slug
-    * /content/:slug/publish - delete
+}
+```
+
+Ahora vamonos a nuestro console `testbox run` o runner de pruebas: http://127.0.0.1:42518/tests/runner.cfm. Y comprobemos que nuestro requisito esta completo.  Si esta completo y tenemos luz verde y hemos acabado nuestro simple headless cms.
+
+Para extra credito terminen las siguientes historias:
+
+```java
+story( "Quiero poder crear una pieza de contenido" )
+story( "Quiero poder editar una pieza de contenido" )
+story( "Quiero poder publicar una pieza de contenido" );
+story( "Quiero poder poner en draft una pieza de contenido" ); 
+story( "Quiero poder remover una pieza de contenido" ); 
+story( "Quiero poder devolver contenido solamente publicado" )
+story( "Quiero poder devolver contenido solamente en draft" )
+```
