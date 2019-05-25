@@ -1,8 +1,6 @@
-Migrations
-* Add user
-* Add content with foreign key 
-* Add data via mock data and bcrypt
-* Add to docker mysql compose to populate the DB.
+# Taller Construyendo un API con BDD
+
+En este taller construiremos un API con BDD
 
 ## Clonar Repositorio
 
